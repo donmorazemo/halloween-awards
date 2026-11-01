@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0a12">
+<title>Halloween Awards — Leaderboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head><body>
+<div class="wrap" style="padding-bottom:48px">
+  <header>
+    <h1 id="title">Halloween Awards</h1>
+    <div class="sub" id="count">Live leaderboard</div>
+    <nav id="nav" class="hidden"><a id="navVote">Vote</a><a id="navRes" class="on">Leaderboard</a></nav>
+  </header>
+  <div id="board"></div>
+</div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="db.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const slug = new URLSearchParams(location.search).get("p") || (DB.live ? "" : "demo");
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text!=null) e.textContent = text; return e; }
+async function load(){
+  let party, res;
+  try{ [party, res] = await Promise.all([DB.getParty(slug), DB.getResults(slug)]); }
+  catch(e){ $("count").textContent = "Couldn't load results: " + e.message; return; }
+  if(!party){ $("count").textContent = "Party not found. Check the link with your host."; return; }
+  $("title").textContent = party.party.name; document.title = party.party.name + " — Leaderboard";
+  $("navVote").href = "index.html?p=" + encodeURIComponent(slug); $("navRes").href = "results.html?p=" + encodeURIComponent(slug);
+  $("nav").classList.remove("hidden");
+  const guests = Object.fromEntries(party.guests.map(g=>[g.id,g]));
+  const board = $("board"); board.innerHTML = "";
+  party.awards.forEach(a=>{
+    const rows = res.tallies.filter(t=>t.award_id===a.id && guests[t.nominee_id]).sort((x,y)=>y.n-x.n);
+    const max = rows.length ? rows[0].n : 0;
+    const card = el("div","card"); card.append(el("h2",null,(a.emoji||"") + " " + a.name));
+    if(!rows.length) card.append(el("div","empty","No votes yet"));
+    rows.forEach(r=>{
+      const g = guests[r.nominee_id], row = el("div","row" + (r.n===max ? " lead" : ""));
+      row.append(el("div","name",g.name), el("div","n",`${r.n} vote${r.n>1?"s":""}`));
+      if(g.costume) row.append(el("div","cost",g.costume));
+      const tr = el("div","track"), f = el("div","fill"); f.style.width = (r.n/max*100).toFixed(0) + "%"; tr.append(f); row.append(tr);
+      card.append(row);
+    });
+    board.append(card);
+  });
+  const v = res.voters, total = party.guests.length;
+  $("count").textContent = `Live leaderboard · ${v} of ${total} guests voted` + (party.party.voting_open ? "" : " · voting closed") + (DB.live ? "" : " · demo");
+}
+load(); DB.onChange(load); setInterval(load, 5000);
+</script>
+</body></html>
