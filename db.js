@@ -110,9 +110,14 @@
       const b = d.ballots.filter(x=>x.voter_guest_id===id).map(x=>x.id);
       d.ballots = d.ballots.filter(x=>x.voter_guest_id!==id); d.votes = d.votes.filter(v=>v.nominee_id!==id && !b.includes(v.ballot_id)); }),
     ballots: live ? remoteTable("ballots") : demoTable("ballots", dropBallotVotes),
-    async session(){ if(!live) return { user:{ email:"demo" } }; return (await sb.auth.getSession()).data.session; },
-    async signIn(email, password){ const { error } = await sb.auth.signInWithPassword({ email, password }); if(error) throw error; },
+    async session(){ if(!live) return { user:{ id:null, email:"demo" } }; return (await sb.auth.getSession()).data.session; },
+    async signInWithGoogle(){
+      const redirectTo = location.origin + location.pathname;
+      const { error } = await sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo } });
+      if(error) throw error;
+    },
+    async signInWithPassword(email, password){ const { error } = await sb.auth.signInWithPassword({ email, password }); if(error) throw error; },
     async signOut(){ if(live) await sb.auth.signOut(); },
-    async isAdmin(){ if(!live) return true; return !!(await q(sb.rpc("is_admin"))); },
+    onAuth(cb){ if(live) sb.auth.onAuthStateChange((evt)=>cb(evt)); },
   };
 })();
