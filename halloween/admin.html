@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0a12">
+<meta name="robots" content="noindex">
+<title>Halloween Awards — Host — Party Games</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../styles.css">
+</head><body>
+<div class="wrap" style="padding-bottom:48px">
+  <a class="back" href="../admin.html">← Party Games</a>
+  <header>
+    <h1>Halloween Awards</h1>
+    <div class="sub" id="who"></div>
+  </header>
+
+  <div id="panel" class="hidden">
+    <!-- Party picker -->
+    <div class="card">
+      <h2>🎃 Your parties</h2>
+      <select class="in" id="partySel" aria-label="Choose party"></select>
+      <form class="addbox" id="addParty">
+        <input class="in" id="newParty" placeholder="New party name, e.g. Halloween 2026" required>
+        <button class="primary">Start new party</button>
+      </form>
+    </div>
+
+    <div id="partyPanel" class="hidden">
+      <div class="card">
+        <h2>📣 Share &amp; status</h2>
+        <div class="stats">
+          <div class="stat"><b id="sVoters">0</b><span>voted</span></div>
+          <div class="stat"><b id="sAwards">0</b><span>awards</span></div>
+          <div class="stat"><b id="sGuests">0</b><span>guests</span></div>
+        </div>
+        <label class="f">Voting link: send this to guests</label>
+        <div class="share"><input class="in" id="voteUrl" readonly><button class="ghost" data-copy="voteUrl">Copy</button></div>
+        <label class="f">Leaderboard link</label>
+        <div class="share"><input class="in" id="resUrl" readonly><button class="ghost" data-copy="resUrl">Copy</button></div>
+        <div class="toggle" style="margin-top:14px">
+          <div><b>Voting open</b><div class="sub" style="margin:2px 0 0;font-size:13px">Turn off to lock all ballots</div></div>
+          <label class="switch"><input type="checkbox" id="openT"><span></span></label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>✏️ Party details</h2>
+        <label class="f" for="pName">Name</label><input class="in" id="pName">
+        <label class="f" for="pSub">Tagline</label><input class="in" id="pSub" placeholder="e.g. Cast your votes before midnight">
+      </div>
+
+      <div class="card">
+        <h2>🏆 Award categories</h2>
+        <div id="awardList"></div>
+        <form class="addbox" id="addAward">
+          <div style="display:flex;gap:8px">
+            <input class="in emo" id="newEmoji" value="🏆" aria-label="Emoji">
+            <input class="in" id="newAward" placeholder="New award, e.g. Best Monster" required style="flex:1;min-width:0">
+          </div>
+          <button class="primary">Add award</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>🧛 Guests &amp; costumes</h2>
+        <div id="guestList"></div>
+        <form class="addbox" id="addGuest">
+          <input class="in" id="newGuest" placeholder="Guest name" required>
+          <textarea class="in" id="newCostume" rows="2" placeholder="Costume description, e.g. Zombie bride with a glowing veil"></textarea>
+          <button class="primary">Add guest</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>⚠️ Danger zone</h2>
+        <div style="display:grid;gap:10px">
+          <button class="danger" id="reset">Reset all votes for this party</button>
+          <button class="danger" id="delParty">Delete this party</button>
+        </div>
+      </div>
+    </div>
+    <div style="text-align:center"><button class="ghost" onclick="out()" id="signOut">Sign out</button></div>
+  </div>
+</div>
+<div class="toast" id="toast">Saved</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="../db.js"></script>
+<script>
+const $ = id => document.getElementById(id), show = (id,on) => $(id).classList.toggle("hidden", !on);
+let parties = [], party = null, awards = [], guests = [], ballots = [];
+
+function toast(m, bad){ const t = $("toast"); t.textContent = m; t.style.background = bad ? "#ff6b6b" : ""; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 1600); }
+async function act(fn, ok){ try{ await fn(); if(ok) toast(ok); await loadParty(); }catch(e){ toast(e.message || "Something went wrong", true); } }
+function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text!=null) e.textContent = text; return e; }
+function btn(label, title, cls, onClick, disabled){ const b = el("button","ib "+(cls||""),label); b.type="button"; b.title=title;
+  b.setAttribute("aria-label", title); b.disabled = !!disabled; b.onclick = onClick; return b; }
+function input(value, o){ const e = el(o.area ? "textarea" : "input", "in " + (o.cls||"")); e.value = value || "";
+  if(o.ph){ e.placeholder = o.ph; e.setAttribute("aria-label", o.ph); } if(o.area) e.rows = 2;
+  e.addEventListener("change", ()=>o.onSave(e.value.trim())); return e; }
+const link = page => new URL(page + "?p=" + encodeURIComponent(party.slug), location.href).href;
+
+async function move(store, list, i, dir){
+  const j = i + dir; if(j<0 || j>=list.length) return;
+  const r = list.slice(); [r[i], r[j]] = [r[j], r[i]];
+  await act(()=>Promise.all(r.map((x,k)=> x.sort===k ? null : store.save({ id:x.id, sort:k }))));
+}
+
+function renderAwards(){
+  const box = $("awardList"); box.innerHTML = "";
+  if(!awards.length) box.append(el("div","empty","No awards yet. Add one below."));
+  awards.forEach((a,i)=>{
+    const it = el("div","item"), line = el("div","line");
+    line.append(
+      input(a.emoji, { cls:"emo", ph:"Emoji", onSave:v=>act(()=>DB.awards.save({ id:a.id, emoji:v||"🏆" }), "Saved") }),
+      input(a.name, { ph:"Award name", onSave:v=> v ? act(()=>DB.awards.save({ id:a.id, name:v }), "Saved") : loadParty() }));
+    const tools = el("div","tools");
+    tools.append(btn("↑","Move up","",()=>move(DB.awards, awards, i, -1), i===0),
+      btn("↓","Move down","",()=>move(DB.awards, awards, i, 1), i===awards.length-1),
+      btn("🗑","Delete award","del",()=>{ if(confirm(`Delete "${a.name}"? Its votes are removed too.`)) act(()=>DB.awards.del(a.id), "Deleted"); }));
+    it.append(line, tools); box.append(it);
+  });
+}
+function renderGuests(){
+  const box = $("guestList"); box.innerHTML = "";
+  if(!guests.length) box.append(el("div","empty","No guests yet. Add them below."));
+  const votedBy = new Map(ballots.map(b=>[b.voter_guest_id, b]));
+  guests.forEach((g,i)=>{
+    const it = el("div","item"), b = votedBy.get(g.id);
+    it.append(input(g.name, { ph:"Guest name", onSave:v=> v ? act(()=>DB.guests.save({ id:g.id, name:v }), "Saved") : loadParty() }),
+      input(g.costume, { ph:"Costume description", area:true, onSave:v=>act(()=>DB.guests.save({ id:g.id, costume:v }), "Saved") }));
+    const tools = el("div","tools"); tools.style.alignItems = "center";
+    if(b){
+      const tag = el("span","voted-tag","✓ Voted"); tag.style.marginRight = "auto"; tools.append(tag);
+      const u = el("button","ghost","Unlock"); u.type = "button"; u.style.minHeight = "44px"; u.style.padding = "8px 12px";
+      u.title = "Delete this guest's ballot so they can vote again";
+      u.onclick = ()=>{ if(confirm(`Unlock ${g.name}? Their current votes are deleted and they can vote again from any phone.`)) act(()=>DB.ballots.del(b.id), "Unlocked"); };
+      tools.append(u);
+    }
+    tools.append(btn("↑","Move up","",()=>move(DB.guests, guests, i, -1), i===0),
+      btn("↓","Move down","",()=>move(DB.guests, guests, i, 1), i===guests.length-1),
+      btn("🗑","Remove guest","del",()=>{ if(confirm(`Remove ${g.name}? Their ballot and votes for them are removed too.`)) act(()=>DB.guests.del(g.id), "Removed"); }));
+    it.append(tools); box.append(it);
+  });
+}
+
+async function loadParties(selectId){
+  parties = await DB.parties.list(me && me.id ? { owner_id:me.id } : undefined);
+  const sel = $("partySel"); sel.innerHTML = "";
+  if(!parties.length){ const o = el("option",null,"No parties yet. Start one below."); o.value = ""; sel.append(o); }
+  parties.forEach(p=>{ const o = el("option",null,p.name + (p.voting_open ? "" : " (closed)")); o.value = p.id; sel.append(o); });
+  const want = selectId || (party && party.id) || +localStorage.getItem("hw_admin_party") || (parties[0] && parties[0].id);
+  party = parties.find(p=>p.id===+want) || parties[0] || null;
+  if(party) sel.value = party.id;
+  await loadParty();
+}
+async function loadParty(){
+  show("partyPanel", !!party); if(!party) return;
+  localStorage.setItem("hw_admin_party", party.id);
+  [awards, guests, ballots] = await Promise.all([DB.awards.list({ party_id:party.id }), DB.guests.list({ party_id:party.id }), DB.ballots.list({ party_id:party.id })]);
+  const fresh = (await DB.parties.list(me && me.id ? { owner_id:me.id } : undefined)).find(p=>p.id===party.id); if(fresh) party = fresh;
+  $("sVoters").textContent = ballots.length; $("sAwards").textContent = awards.length; $("sGuests").textContent = guests.length;
+  $("voteUrl").value = link("index.html"); $("resUrl").value = link("results.html");
+  $("openT").checked = !!party.voting_open;
+  const ae = document.activeElement, typing = ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae.closest("#awardList,#guestList,#pName,#pSub") && ae.value !== undefined;
+  if(!typing){ $("pName").value = party.name; $("pSub").value = party.subtitle || ""; renderAwards(); renderGuests(); }
+}
+
+$("partySel").onchange = e => { party = parties.find(p=>p.id===+e.target.value) || null; loadParty(); };
+$("addParty").onsubmit = async e => { e.preventDefault(); const name = $("newParty").value.trim(); if(!name) return;
+  try{ const p = await DB.parties.save({ name, subtitle:"Vote for the best costumes of the night" }); $("newParty").value = ""; toast("Party created"); await loadParties(p.id); }
+  catch(err){ toast(err.message, true); } };
+$("pName").onchange = () => { const v = $("pName").value.trim(); if(v) act(async()=>{ await DB.parties.save({ id:party.id, name:v }); await loadParties(party.id); }, "Saved"); };
+$("pSub").onchange  = () => act(()=>DB.parties.save({ id:party.id, subtitle:$("pSub").value.trim() }), "Saved");
+$("openT").onchange = () => act(async()=>{ await DB.parties.save({ id:party.id, voting_open:$("openT").checked }); await loadParties(party.id); }, $("openT").checked ? "Voting opened" : "Voting closed");
+$("addAward").onsubmit = e => { e.preventDefault(); const name = $("newAward").value.trim(); if(!name) return;
+  act(async()=>{ await DB.awards.save({ party_id:party.id, name, emoji:$("newEmoji").value.trim()||"🏆", sort:awards.length }); $("newAward").value = ""; }, "Award added"); };
+$("addGuest").onsubmit = e => { e.preventDefault(); const name = $("newGuest").value.trim(); if(!name) return;
+  act(async()=>{ await DB.guests.save({ party_id:party.id, name, costume:$("newCostume").value.trim(), sort:guests.length });
+    $("newGuest").value = ""; $("newCostume").value = ""; $("newGuest").focus(); }, "Guest added"); };
+$("reset").onclick = () => { if(confirm(`Delete ALL votes for "${party.name}"? This can't be undone.`)) act(()=>DB.ballots.delWhere({ party_id:party.id }), "Votes cleared"); };
+$("delParty").onclick = async () => { if(!confirm(`Delete "${party.name}" with all its awards, guests and votes?`)) return;
+  try{ await DB.parties.del(party.id); party = null; toast("Party deleted"); await loadParties(); }catch(e){ toast(e.message, true); } };
+document.querySelectorAll("[data-copy]").forEach(b=>b.onclick = async()=>{ const i = $(b.dataset.copy);
+  try{ await navigator.clipboard.writeText(i.value); toast("Link copied"); }catch(e){ i.select(); } });
+async function out(){ await DB.signOut(); location.href = "../admin.html"; }
+
+let me = null, started = false;
+async function start(){
+  const s = await DB.session();
+  // Sign-in happens once, on the Party Games host page; come back here afterwards.
+  if(!s){ location.replace("../admin.html?next=halloween"); return; }
+  me = s.user;
+  $("who").textContent = DB.live ? `Signed in as ${me.email}` : "Demo mode: saved in this browser only";
+  show("signOut", DB.live); show("panel", true);
+  await loadParties();
+  if(!started){ started = true; DB.onChange(()=>loadParty()); setInterval(()=>loadParty(), 6000); }
+}
+start();
+</script>
+</body></html>

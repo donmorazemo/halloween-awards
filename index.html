@@ -1,123 +1,34 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0d0a12">
-<title>Halloween Awards — Vote</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
-</head><body>
-<div class="wrap">
-  <header>
-    <h1 id="title">Halloween Awards</h1>
-    <div class="sub" id="subtitle"></div>
-    <nav id="nav" class="hidden"><a id="navVote" class="on">Vote</a><a id="navRes">Leaderboard</a></nav>
-  </header>
-  <div id="msg"></div>
-  <div id="who" class="hidden">
-    <div class="card who"><h2>👋 Who are you?</h2><p class="sub" style="text-align:left;margin:-4px 0 14px">Tap your own name. Each guest can vote once.</p><div class="opts people" id="whoList"></div></div>
-  </div>
-  <div id="ballot" class="hidden">
-    <div class="asme"><span>🎃 Voting as</span><b id="meName"></b><button id="switchMe">Not you?</button></div>
-    <div id="awards"></div>
-  </div>
-</div>
-<div class="bar hidden" id="bar"><div class="in">
-  <div class="status" id="status"></div>
-  <button class="primary" id="submit" disabled>Submit votes</button>
-</div></div>
-<div class="toast" id="toast">🎃 Votes saved!</div>
-
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-<script src="db.js"></script>
+<title>Party Games</title>
 <script>
-const $ = id => document.getElementById(id), show = (id,on) => $(id).classList.toggle("hidden", !on);
-const slug = new URLSearchParams(location.search).get("p") || (DB.live ? "" : "demo");
-let data = null, me = null, picks = {}, submitted = false, dirty = false, flash = "";
-
-function msg(html, cls){ $("msg").innerHTML = html ? `<div class="${cls||"card notice"}">${html}</div>` : ""; }
-function el(tag, cls, text){ const e = document.createElement(tag); if(cls) e.className = cls; if(text!=null) e.textContent = text; return e; }
-function guestBtn(g, sel){
-  const b = el("button", "opt" + (sel ? " sel" : "")); b.type = "button";
-  b.append(el("span","gname",g.name)); if(g.costume) b.append(el("span","gcost",g.costume)); return b;
+  // Old Halloween voting links (index.html?p=CODE) keep working.
+  if(new URLSearchParams(location.search).get("p")) location.replace("halloween/index.html" + location.search);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head><body class="hub">
+<div class="wrap" style="padding-bottom:48px">
+  <header>
+    <h1>Party Games</h1>
+    <div class="sub">Games for your party. The host sets one up, guests play from a link. No accounts for guests.</div>
+  </header>
+  <div class="card notice" style="padding:20px 16px">🔗 Got a link from your host? Open it to play.</div>
+  <h2 style="font-size:18px;margin:24px 0 12px">Games</h2>
+  <div class="games" id="games"></div>
+  <a class="cta" href="admin.html">🎉 Host a game →</a>
+  <p class="sub" style="text-align:center;font-size:12px"><a href="privacy.html" style="color:var(--muted)">Privacy</a></p>
+</div>
+<script src="games.js"></script>
+<script>
+const box = document.getElementById("games");
+for(const g of PARTY_GAMES){
+  const a = document.createElement("a"); a.className = "game"; a.href = g.path + "admin.html";
+  a.innerHTML = '<span class="ico"></span><div class="txt"><b></b><div class="sub"></div></div><span class="go">Host →</span>';
+  a.querySelector(".ico").textContent = g.emoji; a.querySelector("b").textContent = g.name; a.querySelector(".sub").textContent = g.blurb;
+  box.append(a);
 }
-
-async function refresh(){
-  try{ data = await DB.getParty(slug); }catch(e){ msg("Couldn't reach the party: " + e.message, "errbox"); return; }
-  if(!data){ msg((slug ? "🦇 This party link doesn't exist. Check the link with your host." : "🦇 Got a party link from your host? Open it to vote.") + '<a class="cta" href="admin.html">🎃 Host your own party →</a>'); show("who",false); show("ballot",false); show("bar",false); return; }
-  const p = data.party;
-  $("title").textContent = p.name; $("subtitle").textContent = p.subtitle; document.title = p.name + " — Vote";
-  $("navVote").href = "index.html?p=" + encodeURIComponent(slug); $("navRes").href = "results.html?p=" + encodeURIComponent(slug); show("nav", true);
-  // drop picks for awards/guests the host removed
-  const aIds = new Set(data.awards.map(a=>a.id)), gIds = new Set(data.guests.map(g=>g.id));
-  for(const k of Object.keys(picks)) if(!aIds.has(+k) || !gIds.has(picks[k])) delete picks[k];
-  if(me && !gIds.has(me.id)) me = null;
-  render();
-}
-
-function render(){
-  const p = data.party, mine = DB.Tokens.all(slug);
-  if(!p.voting_open) msg(`🔒 Voting is closed. <a href="results.html?p=${encodeURIComponent(slug)}" style="color:var(--pumpkin2)">See the results</a>`);
-  else { msg(""); if(flash) $("msg").append(el("div","errbox",flash)); }
-  if(!p.voting_open){ show("who",false); show("ballot",false); show("bar",false); return; }
-  if(!data.awards.length || !data.guests.length){ msg("🕸️ The host is still setting up the awards. Check back in a moment."); show("who",false); show("ballot",false); show("bar",false); return; }
-
-  if(!me){
-    show("ballot",false); show("bar",false); show("who",true);
-    const box = $("whoList"); box.innerHTML = "";
-    data.guests.forEach(g=>{
-      const voted = data.voted.includes(g.id), ours = !!mine[g.id] && voted;
-      const b = guestBtn(g, false);
-      if(ours){ b.classList.add("mine"); b.append(el("span","tag","✓ Voted on this phone · tap to edit")); }
-      else if(voted){ b.disabled = true; b.append(el("span","tag","✓ Already voted")); }
-      b.onclick = () => pickMe(g);
-      box.append(b);
-    });
-    return;
-  }
-  show("who",false); show("ballot",true); show("bar",true);
-  $("meName").textContent = me.name;
-  const box = $("awards"); box.innerHTML = "";
-  data.awards.forEach(a=>{
-    const card = el("div","card"), h = el("h2");
-    h.append(el("span",null,(a.emoji||"") + " " + a.name)); if(picks[a.id]) h.append(el("span","done","✓"));
-    const opts = el("div","opts people");
-    data.guests.forEach(g=>{ const b = guestBtn(g, picks[a.id]===g.id); b.onclick = ()=>{ picks[a.id] = g.id; dirty = true; render(); }; opts.append(b); });
-    card.append(h, opts); box.append(card);
-  });
-  const n = Object.keys(picks).length;
-  $("status").textContent = submitted && !dirty ? `✓ Saved · ${n} of ${data.awards.length} awards` : `${n} of ${data.awards.length} awards picked`;
-  $("submit").textContent = submitted ? "Update votes" : "Submit votes";
-  $("submit").disabled = n === 0 || (submitted && !dirty);
-}
-
-async function pickMe(g){
-  me = g; picks = {}; submitted = false; dirty = false; flash = "";
-  const tok = DB.Tokens.get(slug, g.id);
-  if(tok){ try{ const prev = await DB.getMyBallot(slug, g.id, tok); if(prev){ for(const [a,n] of Object.entries(prev)) picks[+a] = +n; submitted = true; } }catch(e){} }
-  render(); window.scrollTo({ top:0, behavior:"smooth" });
-}
-$("switchMe").onclick = () => { if(dirty && !confirm("Discard your unsaved picks?")) return; me = null; render(); };
-
-$("submit").onclick = async () => {
-  const b = $("submit"); b.disabled = true; b.textContent = "Saving…";
-  try{
-    const tok = DB.Tokens.ensure(slug, me.id);
-    await DB.submitBallot(slug, me.id, tok, picks);
-    submitted = true; dirty = false;
-    const t = $("toast"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), 1800);
-    await refresh();
-  }catch(e){
-    const m = String(e.message||e);
-    if(m.includes("ALREADY_VOTED")){ alertBox(`${me.name} has already voted from another device. If that wasn't you, ask the host to unlock your name.`); me = null; await refresh(); }
-    else if(m.includes("VOTING_CLOSED")){ await refresh(); }
-    else { alertBox("Couldn't save: " + m); render(); }
-  }
-};
-function alertBox(text){ flash = text; if(data) render(); window.scrollTo({ top:0, behavior:"smooth" }); }
-
-refresh();
-DB.onChange(()=>{ if(!dirty) refresh(); });
-setInterval(()=>{ if(!dirty) refresh(); }, 8000);
 </script>
 </body></html>
