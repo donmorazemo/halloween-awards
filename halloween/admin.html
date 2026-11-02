@@ -170,7 +170,7 @@ async function loadParty(){
 
 $("partySel").onchange = e => { party = parties.find(p=>p.id===+e.target.value) || null; loadParty(); };
 $("addParty").onsubmit = async e => { e.preventDefault(); const name = $("newParty").value.trim(); if(!name) return;
-  try{ const p = await DB.parties.save({ name, subtitle:"Vote for the best costumes of the night" }); $("newParty").value = ""; toast("Party created"); await loadParties(p.id); }
+  try{ const p = await DB.parties.save({ name, subtitle:"Vote for the best costumes of the night", ...DB.region("host_") }).catch(e=>{ if(/host_tz|host_locale/.test(String(e.message))) return DB.parties.save({ name, subtitle:"Vote for the best costumes of the night" }); throw e; }); $("newParty").value = ""; toast("Party created"); await loadParties(p.id); }
   catch(err){ toast(err.message, true); } };
 $("pName").onchange = () => { const v = $("pName").value.trim(); if(v) act(async()=>{ await DB.parties.save({ id:party.id, name:v }); await loadParties(party.id); }, "Saved"); };
 $("pSub").onchange  = () => act(()=>DB.parties.save({ id:party.id, subtitle:$("pSub").value.trim() }), "Saved");
