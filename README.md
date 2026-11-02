@@ -1,17 +1,14 @@
-# Party Games
+# Halloween Costume Awards
 
-Mobile-first party games. A host signs in once (Google), sets up a game and shares a link;
-guests play from that link with no account.
+One of the [Party Games](https://donmorazemo.github.io/party-games/) (repo: donmorazemo/party-games).
+Hosts sign in on Party Games; this repo holds the game itself.
 
-| Page | Who | What |
-|---|---|---|
-| `index.html` | Everyone | Party Games home: list of games |
-| `admin.html` | Host | the one sign-in page (Google, or email + password for testing), then pick a game to set up |
-| `games.js` | — | list of games shown on both pages |
+| Page | What |
+|---|---|
+| `index.html`, `admin.html` | forward to Party Games (old links keep working) |
+| `privacy.html` | privacy page (linked from the Google sign-in screen) |
 
-## Games
-
-### 🎃 Halloween Costume Awards (`halloween/`)
+## The game (`halloween/`)
 | Page | Who | What |
 |---|---|---|
 | `halloween/admin.html` | Host | create parties, awards, guests + costumes, open/close voting, unlock names |
@@ -23,13 +20,6 @@ Old links (`index.html?p=CODE`, `results.html?p=CODE` at the top level) redirect
 **One vote per guest:** each guest name gets one ballot, enforced in the database.
 The phone that submitted it can edit it until voting closes. Clearing cache or using
 another phone shows the name as "Already voted". The host can unlock a name.
-
-## Adding a game
-1. Make a folder (e.g. `trivia/`) with its own `admin.html`, `index.html` and `results.html`,
-   loading `../config.js`, `../db.js` and `../styles.css`.
-2. In its `admin.html`, if `DB.session()` is empty, send the host to `../admin.html?next=<game id>`.
-   They come straight back after signing in.
-3. Add the game to `games.js`.
 
 ## Setup
 1. Create a free Supabase project → SQL Editor → run `supabase/schema.sql`, then `supabase/002_party_owners.sql`.

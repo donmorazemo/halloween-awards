@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../styles.css">
 </head><body>
 <div class="wrap" style="padding-bottom:48px">
-  <a class="back" href="../admin.html">← Party Games</a>
+  <a class="back" href="../../party-games/admin.html">← Party Games</a>
   <header>
     <h1>Halloween Awards</h1>
     <div class="sub" id="who"></div>
@@ -185,13 +185,13 @@ $("delParty").onclick = async () => { if(!confirm(`Delete "${party.name}" with a
   try{ await DB.parties.del(party.id); party = null; toast("Party deleted"); await loadParties(); }catch(e){ toast(e.message, true); } };
 document.querySelectorAll("[data-copy]").forEach(b=>b.onclick = async()=>{ const i = $(b.dataset.copy);
   try{ await navigator.clipboard.writeText(i.value); toast("Link copied"); }catch(e){ i.select(); } });
-async function out(){ await DB.signOut(); location.href = "../admin.html"; }
+async function out(){ await DB.signOut(); location.href = "../../party-games/admin.html"; }
 
 let me = null, started = false;
 async function start(){
   const s = await DB.session();
-  // Sign-in happens once, on the Party Games host page; come back here afterwards.
-  if(!s){ location.replace("../admin.html?next=halloween"); return; }
+  // Sign-in happens once, on the Party Games site (donmorazemo/party-games); come back here afterwards.
+  if(!s){ location.replace("../../party-games/admin.html?next=halloween"); return; }
   me = s.user;
   $("who").textContent = DB.live ? `Signed in as ${me.email}` : "Demo mode: saved in this browser only";
   show("signOut", DB.live); show("panel", true);
