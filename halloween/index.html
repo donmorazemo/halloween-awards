@@ -27,7 +27,7 @@
 <div class="toast" id="toast">🎃 Votes saved!</div>
 
 <script src="../config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js" integrity="sha384-GFr3yTh5lJznCbZfpTtXnwboFsxqtTQoeTZCRHhE0579KrRmlCzen5AA8ohaB5ug" crossorigin="anonymous"></script>
 <script src="../db.js"></script>
 <script>
 const $ = id => document.getElementById(id), show = (id,on) => $(id).classList.toggle("hidden", !on);
@@ -42,7 +42,7 @@ function guestBtn(g, sel){
 }
 
 async function refresh(){
-  try{ data = await DB.getParty(slug); }catch(e){ msg("Couldn't reach the party: " + e.message, "errbox"); return; }
+  try{ data = await DB.getParty(slug); }catch(e){ msg(""); $("msg").append(el("div","errbox","Couldn't reach the party: " + e.message)); return; }
   if(!data){ msg((slug ? "🦇 This party link doesn't exist. Check the link with your host." : "🦇 Got a party link from your host? Open it to vote.") + '<a class="cta" href="admin.html">🎃 Host your own party →</a>'); show("who",false); show("ballot",false); show("bar",false); return; }
   const p = data.party;
   $("title").textContent = p.name; $("subtitle").textContent = p.subtitle; document.title = p.name + " — Vote";
