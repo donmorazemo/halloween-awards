@@ -10,7 +10,6 @@
   <header>
     <h1 id="title">Halloween Awards</h1>
     <div class="sub" id="subtitle"></div>
-    <nav id="nav" class="hidden"><a id="navVote" class="on">Vote</a><a id="navRes">Leaderboard</a></nav>
   </header>
   <div id="msg"></div>
   <div id="who" class="hidden">
@@ -47,7 +46,6 @@ async function refresh(){
   if(!data){ msg((slug ? "🦇 This party link doesn't exist. Check the link with your host." : "🦇 Got a party link from your host? Open it to vote.") + '<a class="cta" href="admin.html">🎃 Host your own party →</a>'); show("who",false); show("ballot",false); show("bar",false); return; }
   const p = data.party;
   $("title").textContent = p.name; $("subtitle").textContent = p.subtitle; document.title = p.name + " — Vote";
-  $("navVote").href = "index.html?p=" + encodeURIComponent(slug); $("navRes").href = "results.html?p=" + encodeURIComponent(slug); show("nav", true);
   // drop picks for awards/guests the host removed
   const aIds = new Set(data.awards.map(a=>a.id)), gIds = new Set(data.guests.map(g=>g.id));
   for(const k of Object.keys(picks)) if(!aIds.has(+k) || !gIds.has(picks[k])) delete picks[k];
@@ -57,7 +55,7 @@ async function refresh(){
 
 function render(){
   const p = data.party, mine = DB.Tokens.all(slug);
-  if(!p.voting_open) msg(`🔒 Voting is closed. <a href="results.html?p=${encodeURIComponent(slug)}" style="color:var(--pumpkin2)">See the results</a>`);
+  if(!p.voting_open) msg("🔒 Voting is closed. The host will announce the winners! 🎃");
   else { msg(""); if(flash) $("msg").append(el("div","errbox",flash)); }
   if(!p.voting_open){ show("who",false); show("ballot",false); show("bar",false); return; }
   if(!data.awards.length || !data.guests.length){ msg("🕸️ The host is still setting up the awards. Check back in a moment."); show("who",false); show("ballot",false); show("bar",false); return; }

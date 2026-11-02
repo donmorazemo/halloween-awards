@@ -10,7 +10,6 @@
   <header>
     <h1 id="title">Halloween Awards</h1>
     <div class="sub" id="count">Live leaderboard</div>
-    <nav id="nav" class="hidden"><a id="navVote">Vote</a><a id="navRes" class="on">Leaderboard</a></nav>
   </header>
   <div id="board"></div>
 </div>
@@ -27,8 +26,6 @@ async function load(){
   catch(e){ $("count").textContent = "Couldn't load results: " + e.message; return; }
   if(!party){ $("count").textContent = "Party not found. Check the link with your host."; return; }
   $("title").textContent = party.party.name; document.title = party.party.name + " — Leaderboard";
-  $("navVote").href = "index.html?p=" + encodeURIComponent(slug); $("navRes").href = "results.html?p=" + encodeURIComponent(slug);
-  $("nav").classList.remove("hidden");
   const guests = Object.fromEntries(party.guests.map(g=>[g.id,g]));
   const board = $("board"); board.innerHTML = "";
   party.awards.forEach(a=>{
